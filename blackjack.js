@@ -1,3 +1,19 @@
+/*
+TODO
+
+Current errors
+Deck can run out, no warnings or reshuffles implemented yet
+Card counting includes face down dealer card right now - need to exclude until revealed
+Change game so dealer hits on soft 17 (more common)
+
+Develop
+Betting X!
+Double Down
+Split
+Surrender
+Change number of decks
+
+*/
 /*Global variables*/
 const bankroll = 1000;
 var balance = bankroll;
@@ -10,26 +26,31 @@ const fullCount = {"A":4,"2":4,"3":4,"4":4,"5":4,"6":4,"7":4,
                   "8":4,"9":4,"10":4,"J":4,"Q":4,"K":4};
 
 const value10 = new Set(["10", "J", "Q", "K"]);
-const minus = new Set(["2", "3", "4", "5", "6"]);
-const plus = new Set(["10", "J", "Q", "K", "A"]);
+const plus = new Set(["2", "3", "4", "5", "6"]);
+const minus = new Set(["10", "J", "Q", "K", "A"]);
 
 const hardChart = [];
 
 var currentDeck = [];
 var currentCount = {};
-var currentPoints = 0;
+var runningCount = 0;
 var trueCount = 0;
 
 var dealerHand = [];
 var playerHand = [];
 
 var revealDealer = false;
+var currentBet = 0;
 
 resetDecks();
 
 /*Functions*/
 function deal() {
     clearHands();
+    currentBet = document.getElementById("bet").value;
+    balance -= currentBet;
+    document.getElementById("bet").setAttribute("disabled", "true");
+    document.getElementById("balance").innerHTML = balance;
     revealDealer = false;
     setTimeout(() => {draw(playerHand, currentDeck)}, 500);
     setTimeout(() => {draw(dealerHand, currentDeck)}, 1000);
@@ -37,8 +58,8 @@ function deal() {
     setTimeout(() => {draw(dealerHand, currentDeck)}, 2000);
     //check for blackjack
     document.getElementById("deal").disabled = true;
-    document.getElementById("hit").disabled = false;
-    document.getElementById("stay").disabled = false;
+    setTimeout(() => {document.getElementById("hit").disabled = false}, 2000);
+    setTimeout(() => {document.getElementById("stay").disabled = false}, 2000);
     
 }
 
@@ -48,10 +69,10 @@ function draw(hand, deck) {
     /*updating counters */
     currentCount[card]--;
     if(minus.has(card))
-        currentPoints--;
+        runningCount--;
     if (plus.has(card))
-        currentPoints++;
-    trueCount = currentPoints/(deck.length/52);
+        runningCount++;
+    trueCount = runningCount/(deck.length/52);
 
     hand.push(card);
     updateDisplay();
@@ -76,7 +97,6 @@ function updateDisplay() {
     }
     var playerTotal = scoreHand(playerHand);
     document.getElementById("playerTotal").innerHTML = playerTotal;
-
     //dealer
     for(i = 0; i < dealerHand.length; i++)
     {
@@ -100,6 +120,9 @@ function updateDisplay() {
     if(!revealDealer)
         dealerTotal -= scoreHand(dealerHand[0]);
     document.getElementById("dealerTotal").innerHTML = dealerTotal;
+    //counts
+    document.getElementById("runningCount").innerHTML = runningCount;
+    document.getElementById("trueCount").innerHTML = Math.round(trueCount * 10) / 10;
 }
 
 function hit() {
@@ -112,6 +135,7 @@ function hit() {
         document.getElementById("deal").disabled = false;
         document.getElementById("hit").disabled = true;
         document.getElementById("stay").disabled = true;
+        document.getElementById("bet").disabled = false;
     }
 }
 
@@ -128,17 +152,27 @@ function stay() {
     let dealerScore = scoreHand(dealerHand);
     let playerScore = scoreHand(playerHand);
     if(dealerScore > 21)
-        document.getElementById("dealerTotal").innerHTML = dealerScore + " BUST";
+        {
+            document.getElementById("dealerTotal").innerHTML = dealerScore + " BUST";
+            balance += currentBet * 2;
+            document.getElementById("balance").innerHTML = balance;
+        }
+
     else if(dealerScore > playerScore)
         document.getElementById("playerTotal").innerHTML = playerScore + " LOSE";
     else if(dealerScore < playerScore)
-        document.getElementById("playerTotal").innerHTML = playerScore + " WIN";
+        {
+            document.getElementById("playerTotal").innerHTML = playerScore + " WIN";
+            balance += currentBet * 2;
+            document.getElementById("balance").innerHTML = balance;
+        }
     else
         document.getElementById("playerTotal").innerHTML = playerScore + " PUSH";
 
     document.getElementById("deal").disabled = false;
     document.getElementById("hit").disabled = true;
     document.getElementById("stay").disabled = true;
+    document.getElementById("bet").disabled = false;
 }
 
 function recommend() {
@@ -182,7 +216,8 @@ function resetDecks() {
     
     currentCount = {};
     Object.assign(currentCount, fullCount);
-    currentPoints = 0;
+    runningCount = 0;
+    trueCount = 0;
 
 }
 
@@ -194,6 +229,7 @@ function shuffle(deck) {
         deck[j] = temp;
     }
 }
+
 
 /*Listeners*/
 document.querySelector("#deal").addEventListener('click', deal);
