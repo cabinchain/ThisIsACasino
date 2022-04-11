@@ -1,19 +1,30 @@
 /*
 TODO
 
-Current errors
+Current issues
+Overcounting dealer Busts in the probability calculator because all outcomes are weighted equally, so when Dealer shows 10 and simulates a 6, we look at the entire deck again and bust on most cards.
 Deck can run out, no warnings or reshuffles implemented yet
 Card counting includes face down dealer card right now - need to exclude until revealed
-Change game so dealer hits on soft 17 (more common)
+Change game so dealer hits on soft 17 (more common?)
+If player hits blackjack, does the dealer finish his draw?
+Can bet negative, fix that
 
 Develop
-Betting X!
+Calculate expected value by action for:
+    No counting
+    Point counting
+    full counting
+        Put hidden dealer card back into temp deck when calculating counts
+Betting (Done)
+Blackjack pays 3-2 (also blackjack for dealer)
 Double Down
 Split
 Surrender
-Change number of decks
+Change options (blackjack payout, # of decks, H17 or S17)
+If player hits 21, should I automatically stay?
 
 */
+
 /*Global variables*/
 const bankroll = 1000;
 var balance = bankroll;
@@ -22,6 +33,8 @@ const fullDeck = ["A","A","A","A","2","2","2","2","3","3","3","3",
                 "4","4","4","4","5","5","5","5","6","6","6","6","7","7","7","7",
                 "8","8","8","8","9","9","9","9","10","10","10","10",
                 "J","J","J","J","Q","Q","Q","Q","K","K","K","K"];
+const cardList = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+                
 const fullCount = {"A":4,"2":4,"3":4,"4":4,"5":4,"6":4,"7":4,
                   "8":4,"9":4,"10":4,"J":4,"Q":4,"K":4};
 
@@ -29,12 +42,11 @@ const value10 = new Set(["10", "J", "Q", "K"]);
 const plus = new Set(["2", "3", "4", "5", "6"]);
 const minus = new Set(["10", "J", "Q", "K", "A"]);
 
-const hardChart = [];
-
 var currentDeck = [];
 var currentCount = {};
 var runningCount = 0;
 var trueCount = 0;
+var hiddenCard = "";
 
 var dealerHand = [];
 var playerHand = [];
@@ -60,7 +72,7 @@ function deal() {
     document.getElementById("deal").disabled = true;
     setTimeout(() => {document.getElementById("hit").disabled = false}, 2000);
     setTimeout(() => {document.getElementById("stay").disabled = false}, 2000);
-    
+    //setTimeout(() => {calcProbs()}, 2010);
 }
 
 function draw(hand, deck) {
@@ -68,6 +80,7 @@ function draw(hand, deck) {
     
     /*updating counters */
     currentCount[card]--;
+    
     if(minus.has(card))
         runningCount--;
     if (plus.has(card))
@@ -103,7 +116,7 @@ function updateDisplay() {
         if (!revealDealer && i === 0)
             var card = "?";
         else
-        var card = dealerHand[i];
+            var card = dealerHand[i];
         var currCard = document.getElementById("d"+i);
         if(currCard === null)
         {
@@ -116,13 +129,13 @@ function updateDisplay() {
         }
         currCard.innerHTML = card;
     }
-    var dealerTotal = scoreHand(dealerHand);
-    if(!revealDealer)
-        dealerTotal -= scoreHand(dealerHand[0]);
+    var dealerTotal = scoreHand(dealerHand, !revealDealer);
     document.getElementById("dealerTotal").innerHTML = dealerTotal;
     //counts
     document.getElementById("runningCount").innerHTML = runningCount;
     document.getElementById("trueCount").innerHTML = Math.round(trueCount * 10) / 10;
+
+    console.log(currentCount);
 }
 
 function hit() {
@@ -131,6 +144,8 @@ function hit() {
     let score = scoreHand(playerHand);
     if(score > 21)
     {
+        revealDealer = true;
+        updateDisplay();
         document.getElementById("playerTotal").innerHTML = score + " BUST";
         document.getElementById("deal").disabled = false;
         document.getElementById("hit").disabled = true;
@@ -175,15 +190,80 @@ function stay() {
     document.getElementById("bet").disabled = false;
 }
 
-function recommend() {
+// Calculate expected value of each action
+function calcProbs() {
+    
+    //Dictionary of all outcomes from 17 to bust (Dealer will recursively hit until in range or bust)
+    var dealerOutcomes = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0};
+    dealerNext(dealerHand, currentDeck, dealerOutcomes);
+    console.log(dealerOutcomes);
+
+    //This section may not be necessary if dealerNext always adds up outcomes to 1... Test to see if we can remove.
+    let possibleOutcomes = 0;
+    for(var el in dealerOutcomes) 
+        possibleOutcomes += parseFloat(dealerOutcomes[el]);
+    console.log(possibleOutcomes);
+
+    var dealerProbs = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0};
+    for(el in dealerOutcomes)
+        dealerProbs[el] = dealerOutcomes[el]/possibleOutcomes;
+        console.log(dealerProbs);
+    
+    
+/*calculate dealer probability first, get distribution (dictionary) of results from 17-21. Will be recursive. */
+
+    // No counting
+    // Calculate probability distribution in a list for each 
+    //
 
 }
 
-function scoreHand(hand) {
-    totalScore = 0;
-    totalAce = 0;
-    for(i = 0; i < hand.length; i++) {
-        var card = hand[i];
+function dealerNext(hand, deck, outcomes, prob = 1) {
+    //Create theoretical hand for each deck draw 
+    let currentProb = prob/deck.length;
+    for(let i = 0; i < deck.length; i++)
+    {
+        let tempHand = []; //use let here because recursion may override this
+        let tempDeck = [];
+        Object.assign(tempHand, hand);
+        Object.assign(tempDeck, deck);
+        tempHand.push((tempDeck.splice(i, 1))[0]);
+        let newScore = scoreHand(tempHand, true);
+
+        if (newScore > 21)
+            outcomes["bust"] += currentProb;
+        else if (newScore >= 17)
+            outcomes[newScore] += currentProb;
+        else
+            outcomes = dealerNext(tempHand, tempDeck, outcomes, currentProb);
+    }
+    return outcomes;
+}
+
+// function nextCard(hand, deck) {
+//     //calculates distribution of drawing one more card
+//     let score = scoreHand(hand);
+//     //Dictionary of all outcomes from 4 to bust (2 and 3 not possible because if one card is Ace, will be considered 11)
+//     let distribution = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0, 16:0, 15:0, 14:0, 13:0, 12:0, 11:0, 10:0, 9:0, 8:0, 7:0, 6:0, 5:0, 4:0, 3:0, 2:0};
+//     for(i = 0; i < deck.length; i++)
+//     {
+//         card = deck[i];
+//         tempHand = [];
+//         Object.assign(tempHand, hand);
+//         tempHand.push(card);
+        
+//     }
+//     return distribution;
+// }
+
+function scoreHand(hand, hideFirst = false) {
+    let totalScore = 0;
+    let totalAce = 0;
+    let i = 0;
+    if(hideFirst) //Don't count 1st card
+        i = 1;
+    while(i < hand.length) {
+        let card = hand[i];
         if (card === "A") {
             totalScore += 11;
             totalAce += 1;
@@ -192,6 +272,7 @@ function scoreHand(hand) {
             totalScore +=10;
         else
             totalScore += parseInt(card);
+        i++;
     }
     while(totalScore > 21 && totalAce > 0) {
         totalScore -= 10;
@@ -209,13 +290,18 @@ function clearHands() {
     updateDisplay;
 }
 
-function resetDecks() {
+function resetDecks(numDecks = 1) {
     currentDeck = [];
-    Object.assign(currentDeck, fullDeck);
+    for(decks = 0; decks < numDecks; decks++)
+        for(let i = 0; i < fullDeck.length; i++)
+            currentDeck.push(fullDeck[i]);
     shuffle(currentDeck);
-    
+
     currentCount = {};
     Object.assign(currentCount, fullCount);
+    for (var card in fullCount)
+        currentCount[card] = fullCount[card] * numDecks;
+    
     runningCount = 0;
     trueCount = 0;
 
