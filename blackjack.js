@@ -72,7 +72,7 @@ function deal() {
     document.getElementById("deal").disabled = true;
     setTimeout(() => {document.getElementById("hit").disabled = false}, 2000);
     setTimeout(() => {document.getElementById("stay").disabled = false}, 2000);
-    //setTimeout(() => {calcProbs()}, 2010);
+    setTimeout(() => {calcProbs()}, 2010);
 }
 
 function draw(hand, deck) {
@@ -80,7 +80,7 @@ function draw(hand, deck) {
     
     /*updating counters */
     currentCount[card]--;
-    
+
     if(minus.has(card))
         runningCount--;
     if (plus.has(card))
@@ -135,7 +135,7 @@ function updateDisplay() {
     document.getElementById("runningCount").innerHTML = runningCount;
     document.getElementById("trueCount").innerHTML = Math.round(trueCount * 10) / 10;
 
-    console.log(currentCount);
+    //console.log(currentCount);
 }
 
 function hit() {
@@ -193,21 +193,15 @@ function stay() {
 // Calculate expected value of each action
 function calcProbs() {
     
+    //Inefficient method uses all cards in available decks
+    //Better method uses "card list" (13 total cards) and checks currentCount for available cards
+
+    //Dealer probability
     //Dictionary of all outcomes from 17 to bust (Dealer will recursively hit until in range or bust)
     var dealerOutcomes = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0};
-    dealerNext(dealerHand, currentDeck, dealerOutcomes);
+    
+    dealerNext(dealerHand, cardList, dealerOutcomes, currentCount);
     console.log(dealerOutcomes);
-
-    //This section may not be necessary if dealerNext always adds up outcomes to 1... Test to see if we can remove.
-    let possibleOutcomes = 0;
-    for(var el in dealerOutcomes) 
-        possibleOutcomes += parseFloat(dealerOutcomes[el]);
-    console.log(possibleOutcomes);
-
-    var dealerProbs = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0};
-    for(el in dealerOutcomes)
-        dealerProbs[el] = dealerOutcomes[el]/possibleOutcomes;
-        console.log(dealerProbs);
     
     
 /*calculate dealer probability first, get distribution (dictionary) of results from 17-21. Will be recursive. */
@@ -218,24 +212,29 @@ function calcProbs() {
 
 }
 
-function dealerNext(hand, deck, outcomes, prob = 1) {
-    //Create theoretical hand for each deck draw 
-    let currentProb = prob/deck.length;
+function dealerNext(hand, deck, outcomes, count, prob = 1) {
+    //Create theoretical hand for each deck draw
+    let totalCards = 0;
+    for (var c in count)
+        totalCards += count[c];
+    let currentProb = prob/totalCards;
+
     for(let i = 0; i < deck.length; i++)
     {
         let tempHand = []; //use let here because recursion may override this
-        let tempDeck = [];
+        let tempCount = {};
         Object.assign(tempHand, hand);
-        Object.assign(tempDeck, deck);
-        tempHand.push((tempDeck.splice(i, 1))[0]);
+        Object.assign(tempCount, count);
+        let card = deck[i];
+        tempHand.push(card);
         let newScore = scoreHand(tempHand, true);
 
         if (newScore > 21)
-            outcomes["bust"] += currentProb;
+            outcomes["bust"] += currentProb * tempCount[card];
         else if (newScore >= 17)
-            outcomes[newScore] += currentProb;
+            outcomes[newScore] += currentProb * tempCount[card];
         else
-            outcomes = dealerNext(tempHand, tempDeck, outcomes, currentProb);
+            outcomes = dealerNext(tempHand, deck, outcomes, tempCount, currentProb * tempCount[card]);
     }
     return outcomes;
 }
