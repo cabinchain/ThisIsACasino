@@ -54,6 +54,9 @@ var playerHand = [];
 var revealDealer = false;
 var currentBet = 0;
 
+var dealerOutcomes = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0};
+var playerOutcomes = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0, 16:0, 15:0, 14:0, 13:0, 12:0, 11:0, 10:0, 9:0, 8:0, 7:0, 6:0};
+    
 resetDecks();
 
 /*Functions*/
@@ -134,8 +137,6 @@ function updateDisplay() {
     //counts
     document.getElementById("runningCount").innerHTML = runningCount;
     document.getElementById("trueCount").innerHTML = Math.round(trueCount * 10) / 10;
-
-    //console.log(currentCount);
 }
 
 function hit() {
@@ -198,27 +199,47 @@ function calcProbs() {
 
     //Dealer probability
     //Dictionary of all outcomes from 17 to bust (Dealer will recursively hit until in range or bust)
-    var dealerOutcomes = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0};
-    
+    dealerOutcomes = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0};
     dealerNext(dealerHand, cardList, dealerOutcomes, currentCount);
     console.log(dealerOutcomes);
     
-    
-/*calculate dealer probability first, get distribution (dictionary) of results from 17-21. Will be recursive. */
+    //Player outcomes
+    playerOutcomes = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0, 16:0, 15:0, 14:0, 13:0, 12:0, 11:0, 10:0, 9:0, 8:0, 7:0, 6:0};
+    playerNext(playerHand, cardList, playerOutcomes, currentCount);
+    console.log(playerOutcomes);
 
-    // No counting
-    // Calculate probability distribution in a list for each 
-    //
+    //Recommended Decision
+    winIfStay = 1;
+    for (let i = scoreHand(playerHand) + 1; i <= 21; i++)
+        winIfStay -= dealerOutcomes[i]; //Subtract outcomes where dealer has higher value
+    //True WinIfStay probability needs to exclude chance of tying.
+    trueWinIfStay = winIfStay/(winIfStay + (1 - winIfStay - dealerOutcomes[scoreHand(playerHand)]));
 
+    winIfHit = 0;
+    loseIfHit = 0;
+    for (let i = 17; i <= 21; i++)
+    {
+        for (let j = 6; j <= 21; j++)
+        {
+            if (j > i)
+                winIfHit += playerOutcomes[j] * dealerOutcomes[i];
+            if (i > j)
+                loseIfHit += playerOutcomes[j] * dealerOutcomes[i];
+        }
+    }
+    winIfHit += (1 - playerOutcomes["bust"]) * dealerOutcomes["bust"];
+    loseIfHit += playerOutcomes["bust"];
+    trueWinIfHit = winIfHit/(winIfHit + loseIfHit);
 }
 
 function dealerNext(hand, deck, outcomes, count, prob = 1) {
-    //Create theoretical hand for each deck draw
+    //Calculate probability of each new potential hand
     let totalCards = 0;
-    for (var c in count)
+    for (let c in count)
         totalCards += count[c];
     let currentProb = prob/totalCards;
 
+    //Create theoretical hands for "next" deck draw
     for(let i = 0; i < deck.length; i++)
     {
         let tempHand = []; //use let here because recursion may override this
@@ -236,24 +257,34 @@ function dealerNext(hand, deck, outcomes, count, prob = 1) {
         else
             outcomes = dealerNext(tempHand, deck, outcomes, tempCount, currentProb * tempCount[card]);
     }
-    return outcomes;
+    return outcomes; //don't need?
 }
 
-// function nextCard(hand, deck) {
-//     //calculates distribution of drawing one more card
-//     let score = scoreHand(hand);
-//     //Dictionary of all outcomes from 4 to bust (2 and 3 not possible because if one card is Ace, will be considered 11)
-//     let distribution = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0, 16:0, 15:0, 14:0, 13:0, 12:0, 11:0, 10:0, 9:0, 8:0, 7:0, 6:0, 5:0, 4:0, 3:0, 2:0};
-//     for(i = 0; i < deck.length; i++)
-//     {
-//         card = deck[i];
-//         tempHand = [];
-//         Object.assign(tempHand, hand);
-//         tempHand.push(card);
-        
-//     }
-//     return distribution;
-// }
+function playerNext(hand, deck, outcomes, count, prob = 1) {
+    //Calculate probability of each new potential hand
+    let totalCards = 0;
+    for (let c in count)
+        totalCards += count[c];
+    let currentProb = prob/totalCards;
+
+    //Create theoretical hands for "next" deck draw
+    for(let i = 0; i < deck.length; i++)
+    {
+        let tempHand = []; //use let here because recursion may override this
+        let tempCount = {};
+        Object.assign(tempHand, hand);
+        Object.assign(tempCount, count);
+        let card = deck[i];
+        tempHand.push(card);
+        let newScore = scoreHand(tempHand, false);
+
+        if (newScore > 21)
+            outcomes["bust"] += currentProb * tempCount[card];
+        else
+            outcomes[newScore] += currentProb * tempCount[card];
+    }
+    return outcomes;//don't need?
+}
 
 function scoreHand(hand, hideFirst = false) {
     let totalScore = 0;
@@ -282,7 +313,7 @@ function scoreHand(hand, hideFirst = false) {
 
 function clearHands() {
     children = document.querySelectorAll('.card');
-    for(i = 0; i < children.length; i++)
+    for(let i = 0; i < children.length; i++)
         children[i].remove();
     dealerHand = [];
     playerHand = [];
@@ -303,13 +334,12 @@ function resetDecks(numDecks = 1) {
     
     runningCount = 0;
     trueCount = 0;
-
 }
 
 function shuffle(deck) {
-    for (var i = deck.length - 1; i > 0; i--) {
-        var j = Math.floor(Math.random() * (i + 1));
-        var temp = deck[i];
+    for (let i = deck.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        let temp = deck[i];
         deck[i] = deck[j];
         deck[j] = temp;
     }
