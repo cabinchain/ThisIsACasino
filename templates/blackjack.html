@@ -6,6 +6,13 @@
         <link href="../static/style.css" rel="stylesheet">
     </head>
     <body style="color: white; background-color: green;">
+        <h1>Setup</h1>
+        <label>Number of Decks:</label>
+        <div style="display:inline">
+            <input id="decks" style="display:inline" type="number" min="1" max="8" value="1">
+        </div>
+        <button id="set_decks">Set</button>
+        <br><br>
         <h1 style="display:inline">Dealer </h1><h1 style="display:inline" id="dealerTotal"></h1>
         <div class="hand" id="dealerHand">
         </div>
@@ -14,18 +21,20 @@
         <div class="hand" id="playerHand">
         </div>
         <br>
-        <button id="deal">DEAL</button> <button id="hit" disabled=true>HIT</button> <button id="stay" disabled=true>STAY</button>
+        <button id="deal" disabled=true>DEAL</button> <button id="hit" disabled=true>HIT</button> <button id="stay" disabled=true>STAY</button>
         <button id="double" disabled=true>DOUBLE</button> <button id="split" disabled=true>SPLIT</button> <button id="surrender" disabled=true>SURRENDER</button>
-        <br><br><br>
-        Bet: <input id="bet" type=number placeholder=0>
-        <h2>Balance: </h2><h2 id="balance">1000</h2>
-        <br>
+        <br><br>
+
+        <br><br>
+        Bet: <input id="bet" type=number placeholder=0><br>
+        <h2 style="display:inline">Balance: </h2><h2 id="balance" style="display:inline">1000</h2>
+        <br><br>
         <div style="display:inline">Count: </div><div id = "runningCount" style="display:inline">test</div>
         <br>
         <div style="display:inline">True Count: </div><div id = "trueCount" style="display:inline">test</div>
         <br>
         <table>
-            <tr> <th></th> <th>17</th> <th>18</th> <th>19</th> <th>20</th> <th>21</th> <th>bust</th> </tr>
+            <tr> <th>    </th> <th>17</th> <th>18</th> <th>19</th> <th>20</th> <th>21</th> <th>bust</th> </tr>
             <tr>
                 <td></td>
             </tr>

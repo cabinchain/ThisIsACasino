@@ -1,27 +1,31 @@
 /*
-TODO
 
+Notes for users:
+Win percentages are probability of win / probability of win or lose. This ignores ties.
+
+
+TODO
 Current issues
-Overcounting dealer Busts in the probability calculator because all outcomes are weighted equally, so when Dealer shows 10 and simulates a 6, we look at the entire deck again and bust on most cards.
-Deck can run out, no warnings or reshuffles implemented yet
-Card counting includes face down dealer card right now - need to exclude until revealed
-Change game so dealer hits on soft 17 (more common?)
-If player hits blackjack, does the dealer finish his draw?
-Can bet negative, fix that
+1) Deck can run out, no warnings or reshuffles implemented yet
+2) Card counting includes face down dealer card right now - need to exclude until revealed
+    Solution: In deal function, add facedown card back into count. In stay function, subtract it.
+3) Change game so dealer hits on soft 17 (more common?)
+4) Can bet negative, fix that
 
 Develop
 Calculate expected value by action for:
     No counting
     Point counting
     full counting
-        Put hidden dealer card back into temp deck when calculating counts
-Betting (Done)
-Blackjack pays 3-2 (also blackjack for dealer)
+
+Blackjack pays 3-2 (does dealer continue drawing?)
+Blackjack for dealer
 Double Down
 Split
 Surrender
 Change options (blackjack payout, # of decks, H17 or S17)
 If player hits 21, should I automatically stay?
+Add Delay to dealer drawing cards in stay function
 
 */
 
@@ -56,8 +60,6 @@ var currentBet = 0;
 
 var dealerOutcomes = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0};
 var playerOutcomes = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0, 16:0, 15:0, 14:0, 13:0, 12:0, 11:0, 10:0, 9:0, 8:0, 7:0, 6:0};
-    
-resetDecks();
 
 /*Functions*/
 function deal() {
@@ -153,6 +155,7 @@ function hit() {
         document.getElementById("stay").disabled = true;
         document.getElementById("bet").disabled = false;
     }
+    calcProbs();
 }
 
 function stay() {
@@ -210,10 +213,13 @@ function calcProbs() {
 
     //Recommended Decision
     winIfStay = 1;
-    for (let i = scoreHand(playerHand) + 1; i <= 21; i++)
+    playerScore = scoreHand(playerHand);
+    for (let i = Math.max(17,playerScore); i <= 21; i++)
         winIfStay -= dealerOutcomes[i]; //Subtract outcomes where dealer has higher value
-    //True WinIfStay probability needs to exclude chance of tying.
-    trueWinIfStay = winIfStay/(winIfStay + (1 - winIfStay - dealerOutcomes[scoreHand(playerHand)]));
+    //True WinIfStay probability needs to ignore the chance of tying.
+    if (playerScore >= 17)
+        trueWinIfStay = winIfStay/(1 - dealerOutcomes[playerScore]);
+    else trueWinIfStay = winIfStay;
 
     winIfHit = 0;
     loseIfHit = 0;
@@ -230,6 +236,8 @@ function calcProbs() {
     winIfHit += (1 - playerOutcomes["bust"]) * dealerOutcomes["bust"];
     loseIfHit += playerOutcomes["bust"];
     trueWinIfHit = winIfHit/(winIfHit + loseIfHit);
+    console.log(trueWinIfStay);
+    console.log(trueWinIfHit);
 }
 
 function dealerNext(hand, deck, outcomes, count, prob = 1) {
@@ -320,7 +328,8 @@ function clearHands() {
     updateDisplay;
 }
 
-function resetDecks(numDecks = 1) {
+function resetDecks() {
+    let numDecks = document.getElementById("decks").value;
     currentDeck = [];
     for(decks = 0; decks < numDecks; decks++)
         for(let i = 0; i < fullDeck.length; i++)
@@ -334,6 +343,8 @@ function resetDecks(numDecks = 1) {
     
     runningCount = 0;
     trueCount = 0;
+
+    document.getElementById("deal").disabled = false;
 }
 
 function shuffle(deck) {
@@ -347,6 +358,10 @@ function shuffle(deck) {
 
 
 /*Listeners*/
+document.querySelector("#set_decks").addEventListener('click', resetDecks);
 document.querySelector("#deal").addEventListener('click', deal);
 document.querySelector("#hit").addEventListener('click', hit);
 document.querySelector("#stay").addEventListener('click', stay);
+// document.querySelector("#double").addEventListener('click', double);
+// document.querySelector("#split").addEventListener('click', split);
+// document.querySelector("#surrender").addEventListener('click', surrender);
