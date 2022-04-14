@@ -33,6 +33,7 @@ Add Delay to dealer drawing cards in stay function
 const bankroll = 1000;
 var balance = bankroll;
 
+var numDecks = 0;
 const fullDeck = ["A","A","A","A","2","2","2","2","3","3","3","3",
                 "4","4","4","4","5","5","5","5","6","6","6","6","7","7","7","7",
                 "8","8","8","8","9","9","9","9","10","10","10","10",
@@ -68,15 +69,21 @@ function deal() {
     balance -= currentBet;
     document.getElementById("bet").setAttribute("disabled", "true");
     document.getElementById("balance").innerHTML = balance;
+    document.getElementById("decks").disabled = true;
+    document.getElementById("set_decks").disabled = true;
     revealDealer = false;
     setTimeout(() => {draw(playerHand, currentDeck)}, 500);
     setTimeout(() => {draw(dealerHand, currentDeck)}, 1000);
     setTimeout(() => {draw(playerHand, currentDeck)}, 1500);
     setTimeout(() => {draw(dealerHand, currentDeck)}, 2000);
+
     //check for blackjack
+    
     document.getElementById("deal").disabled = true;
     setTimeout(() => {document.getElementById("hit").disabled = false}, 2000);
     setTimeout(() => {document.getElementById("stay").disabled = false}, 2000);
+
+
     setTimeout(() => {calcProbs()}, 2010);
 }
 
@@ -137,6 +144,7 @@ function updateDisplay() {
     var dealerTotal = scoreHand(dealerHand, !revealDealer);
     document.getElementById("dealerTotal").innerHTML = dealerTotal;
     //counts
+    document.getElementById("deckCount").innerHTML = currentDeck.length;
     document.getElementById("runningCount").innerHTML = runningCount;
     document.getElementById("trueCount").innerHTML = Math.round(trueCount * 10) / 10;
 }
@@ -150,10 +158,7 @@ function hit() {
         revealDealer = true;
         updateDisplay();
         document.getElementById("playerTotal").innerHTML = score + " BUST";
-        document.getElementById("deal").disabled = false;
-        document.getElementById("hit").disabled = true;
-        document.getElementById("stay").disabled = true;
-        document.getElementById("bet").disabled = false;
+        endRound();
     }
     calcProbs();
 }
@@ -188,13 +193,28 @@ function stay() {
     else
         document.getElementById("playerTotal").innerHTML = playerScore + " PUSH";
 
+    endRound();
+}
+
+function endRound() {
     document.getElementById("deal").disabled = false;
     document.getElementById("hit").disabled = true;
     document.getElementById("stay").disabled = true;
     document.getElementById("bet").disabled = false;
+
+    checkDeckSize();
+    document.getElementById("decks").disabled = false;
+    document.getElementById("set_decks").disabled = false;
 }
 
-// Calculate expected value of each action
+function checkDeckSize() {
+    if (currentDeck.length < numDecks * 13)
+    {
+        resetDecks();
+        console.log("reset decks");
+    }
+}
+
 function calcProbs() {
     
     //Inefficient method uses all cards in available decks
@@ -329,7 +349,7 @@ function clearHands() {
 }
 
 function resetDecks() {
-    let numDecks = document.getElementById("decks").value;
+    numDecks = document.getElementById("decks").value;
     currentDeck = [];
     for(decks = 0; decks < numDecks; decks++)
         for(let i = 0; i < fullDeck.length; i++)
@@ -345,6 +365,9 @@ function resetDecks() {
     trueCount = 0;
 
     document.getElementById("deal").disabled = false;
+    document.getElementById("decks").disabled = true;
+    document.getElementById("set_decks").disabled = true;
+    document.getElementById("set_decks").innerHTML = "Reset";
 }
 
 function shuffle(deck) {
