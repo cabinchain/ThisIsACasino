@@ -91,6 +91,7 @@ class Game { //all visual updates should be handled by this object
         setTimeout(() => {document.getElementById("hit").disabled = false}, 2002);
         setTimeout(() => {document.getElementById("stay").disabled = false}, 2002);
         setTimeout(() => {document.getElementById("double").disabled = false}, 2002);
+        setTimeout(() => {document.getElementById("surrender").disabled = false}, 2002);
         
         setTimeout(() => {this.checkBlackjack()}, 2003);
         setTimeout(() => {this.checkPair()}, 2003);
@@ -104,6 +105,11 @@ class Game { //all visual updates should be handled by this object
             this.dealerHand.reveal();
             this.endRound();
             return true;
+        }
+        if (this.dealerHand.peak() === 21)
+        {
+            this.dealerHand.reveal();
+            this.endRound();
         }
         return false;
     }
@@ -129,7 +135,7 @@ class Game { //all visual updates should be handled by this object
     }
 
     stay() { //iterates dealer until >= 17
-        this.dealerHand.hideFirst = false;
+        this.dealerHand.reveal();
         this.updateDisplay();
 
         //deal dealer (will not deal if over 16 already)
@@ -144,7 +150,6 @@ class Game { //all visual updates should be handled by this object
             // setTimeout(() => {this.updateDisplay()}, time);
             //time += 250;
         }
-
         this.endRound();
     }
 
@@ -154,6 +159,12 @@ class Game { //all visual updates should be handled by this object
         this.currentBet *= 2;
         this.hit();
         this.stay();
+    }
+
+    surrender() { //give up half your bet to quit hand
+        this.playerHand.clearHand();
+        this.dealerHand.reveal();
+        this.endRound();
     }
 
     endRound(){ //Updates the winner, payouts, and buttons
@@ -189,6 +200,12 @@ class Game { //all visual updates should be handled by this object
             playerStatus = "PUSH";
             this.balance += parseInt(this.currentBet);
         }
+        else if (playerScore == 0)
+        { //Surrendered
+            dealerStatus = "";
+            playerStatus = "SURRENDER";
+            this.balance += Math.floor(this.currentBet / 2);
+        }
         else if (dealerScore > playerScore)
         {
             dealerStatus = "";
@@ -201,6 +218,7 @@ class Game { //all visual updates should be handled by this object
             playerStatus = "WIN";
             this.balance += this.currentBet * 2;
         }
+        
         document.getElementById("dealerTotal").innerHTML = dealerScore + " " + dealerStatus;
         document.getElementById("playerTotal").innerHTML = playerScore + " " + playerStatus;
         document.getElementById("balance").innerHTML = this.balance;
@@ -588,7 +606,7 @@ class Hand {
         return this.value;
     }
 
-    add(card) {
+    add(card) { //adds card without drawing from a deck
         this.cardList.push(card);
         this.value = this.scoreHand();
         return this.value;
@@ -636,6 +654,13 @@ class Hand {
         return "";
     }
 
+    peak() {
+        this.hideFirst = false;
+        let score = this.scoreHand();
+        this.hideFirst = true;
+        return score;
+    }
+
     clearHand() {
         this.cardList = [];
         this.value = 0;
@@ -675,5 +700,5 @@ document.querySelector("#hit").addEventListener('click', currentGame.hit.bind(cu
 document.querySelector("#stay").addEventListener('click', currentGame.stay.bind(currentGame));
 document.querySelector("#double").addEventListener('click', currentGame.double.bind(currentGame));
 // document.querySelector("#split").addEventListener('click', split);
-// document.querySelector("#surrender").addEventListener('click', surrender);
+document.querySelector("#surrender").addEventListener('click', currentGame.surrender.bind(currentGame));
 //document.querySelector("#clear").addEventListener('click', clearHands);
