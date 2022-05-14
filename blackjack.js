@@ -20,14 +20,17 @@ Calculate expected value by action for:
     Point counting
     full counting
 
-Blackjack pays 3-2 (does dealer continue drawing?)
-Blackjack for dealer
-Double Down
-Split
+DONE Blackjack pays 3-2 (does dealer continue drawing?)
+DONE Double
+Split (This requires updating to multiple players)
 Surrender
 Change options (blackjack payout, # of decks, H17 or S17)
 If player hits 21, should I automatically stay?
 Add Delay to dealer drawing cards in stay function
+
+Unit Testing:
+blackjack
+Test on a push (betting money outcomes and display)
 
 */
 
@@ -40,10 +43,6 @@ class Game { //all visual updates should be handled by this object
     currentBet;
     dealerHand;
     playerHand;
-    dealerOutcomeProbs;
-    playerOutcomeProbsOnHit; 
-    trueWinIfStay; 
-    trueWinIfHit; 
 
     constructor(bankroll, numDecks) {
         this.bankroll = bankroll;
@@ -89,18 +88,17 @@ class Game { //all visual updates should be handled by this object
         setTimeout(() => {this.dealerHand.hit(this.currentDeck)}, 2000);
         setTimeout(() => {this.updateDisplay()}, 2001);
 
-        setTimeout(() => {document.getElementById("hit").disabled = false}, 2005);
-        setTimeout(() => {document.getElementById("stay").disabled = false}, 2005);
+        setTimeout(() => {document.getElementById("hit").disabled = false}, 2002);
+        setTimeout(() => {document.getElementById("stay").disabled = false}, 2002);
+        setTimeout(() => {document.getElementById("double").disabled = false}, 2002);
         
-        setTimeout(() => {this.checkBlackjack()}, 2050);
+        setTimeout(() => {this.checkBlackjack()}, 2003);
+        setTimeout(() => {this.checkPair()}, 2003);
         
-        setTimeout(() => {this.dealerProbs()}, 2100);
-        setTimeout(() => {this.playerProbs()}, 2110);
-        setTimeout(() => {this.winProbs()}, 2120);
-        setTimeout(() => {this.updateProbs()}, 2130);
+        setTimeout(() => {this.updateProbs()}, 2005);
     }
 
-    checkBlackjack() { //needed in order to chekc blackjack on delay
+    checkBlackjack() { //needed in order to check blackjack on delay
         if (this.playerHand.scoreHand() === 21)
         { // endRound will result in Push if dealer also has blackjack, otherwise, player wins automatically.
             this.dealerHand.reveal();
@@ -110,9 +108,19 @@ class Game { //all visual updates should be handled by this object
         return false;
     }
 
+    checkPair() {
+        if (this.playerHand.isPair())
+        {
+            document.getElementById("split").disabled = false;
+            return true;
+        }
+        return false;
+    }
+
     hit(){
         let score = this.playerHand.hit(this.currentDeck);
         this.updateDisplay();
+        this.updateProbs();
         if (score > 21)
         {
             this.dealerHand.reveal();
@@ -138,6 +146,14 @@ class Game { //all visual updates should be handled by this object
         }
 
         this.endRound();
+    }
+
+    double() {
+        // Double bet amount
+        this.balance = parseInt(this.balance) + parseInt(this.currentBet); //this shouldn't be necessary but the numbers act like strings otherwise
+        this.currentBet *= 2;
+        this.hit();
+        this.stay();
     }
 
     endRound(){ //Updates the winner, payouts, and buttons
@@ -171,7 +187,7 @@ class Game { //all visual updates should be handled by this object
         {
             dealerStatus = "";
             playerStatus = "PUSH";
-            this.balance += this.currentBet;
+            this.balance += parseInt(this.currentBet);
         }
         else if (dealerScore > playerScore)
         {
@@ -193,6 +209,9 @@ class Game { //all visual updates should be handled by this object
         document.getElementById("deal").disabled = false;
         document.getElementById("hit").disabled = true;
         document.getElementById("stay").disabled = true;
+        document.getElementById("double").disabled = true;
+        document.getElementById("split").disabled = true;
+        document.getElementById("surrender").disabled = true;
         document.getElementById("clear").disabled = false;
         document.getElementById("bet").disabled = false;
     
@@ -251,32 +270,24 @@ class Game { //all visual updates should be handled by this object
     document.getElementById("deckCount").innerHTML = this.currentDeck.currentDeck.length;
     document.getElementById("runningCount").innerHTML = this.currentDeck.hiloCount;
     document.getElementById("trueCount").innerHTML = Math.round(this.currentDeck.trueCount * 10) / 10;
-    }
- 
-    dealerProbs(){
-        let outcomes = {"bust":0, "21":0, "20":0, "19":0, "18":0, "17":0};
-        this.dealerOutcomeProbs = this.currentDeck.calcDealer(this.dealerHand, outcomes);
-        console.log(this.dealerOutcomeProbs);
+
     }
 
-    playerProbs(){
-        let outcomes = {"bust":0, "21":0, "20":0, "19":0, "18":0, "17":0, "16":0, "15":0, "14":0, "13":0, "12":0, "11":0, "10":0, "9":0, "8":0, "7":0, "6":0};
-        this.playerOutcomeProbsOnHit = this.currentDeck.calcPlayer(this.playerHand, outcomes);
-        console.log(this.playerOutcomeProbsOnHit);
-    }
-
-    winProbs() {
+    calcWinIfStay(dealerOutcomeProbs) {
         let winIfStay = 1;
         let playerScore = this.playerHand.scoreHand();
         for (let i = Math.max(17,playerScore); i <= 21; i++)
-            winIfStay -= this.dealerOutcomeProbs[i.toString()]; //Subtract outcomes where dealer has higher value
+            winIfStay -= dealerOutcomeProbs[i.toString()]; //Subtract outcomes where dealer has higher value
         //True WinIfStay probability needs to ignore the chance of tying.
         if (playerScore > 21)
-            this.trueWinIfStay = 0;
+            winIfStay = 0;
         else if (playerScore >= 17) //tie is possible, only consider probability of win / probability of not tying
-            this.trueWinIfStay = winIfStay/(1 - this.dealerOutcomeProbs[playerScore]);
-        else this.trueWinIfStay = winIfStay; //This should only be probability that dealer busts since player will have less than 17
-    
+            winIfStay = winIfStay/(1 - dealerOutcomeProbs[playerScore]);
+        // Otherwise, this should only be probability that dealer busts since player will have less than 17
+        return winIfStay;
+    }
+
+    calcWinIfHit(dealerOutcomeProbs, playerOutcomeProbsOnHit) {
         let winIfHit = 0;
         let loseIfHit = 0;
         for (let i = 17; i <= 21; i++)
@@ -284,19 +295,25 @@ class Game { //all visual updates should be handled by this object
             for (let j = 6; j <= 21; j++)
             {
                 if (j > i)
-                    winIfHit += this.playerOutcomeProbsOnHit[j] * this.dealerOutcomeProbs[i];
+                    winIfHit += playerOutcomeProbsOnHit[j] * dealerOutcomeProbs[i];
                 if (i > j)
-                    loseIfHit += this.playerOutcomeProbsOnHit[j] * this.dealerOutcomeProbs[i];
+                    loseIfHit += playerOutcomeProbsOnHit[j] * dealerOutcomeProbs[i];
             }
         }
-        winIfHit += (1 - this.playerOutcomeProbsOnHit["bust"]) * this.dealerOutcomeProbs["bust"];
-        loseIfHit += this.playerOutcomeProbsOnHit["bust"];
-        this.trueWinIfHit = winIfHit/(winIfHit + loseIfHit);
-
-        console.log(this.trueWinIfStay + " " + this.trueWinIfHit);
+        winIfHit += (1 - playerOutcomeProbsOnHit["bust"]) * dealerOutcomeProbs["bust"];
+        loseIfHit += playerOutcomeProbsOnHit["bust"];
+        return winIfHit/(winIfHit + loseIfHit);
+        
     }
 
     updateProbs(){ //build probability tables
+        let dealerOutcomeProbs = {"bust":0, "21":0, "20":0, "19":0, "18":0, "17":0};
+        dealerOutcomeProbs = this.currentDeck.calcDealer(this.dealerHand, dealerOutcomeProbs);
+        let playerOutcomeProbsOnHit = {"bust":0, "21":0, "20":0, "19":0, "18":0, "17":0, "16":0, "15":0, "14":0, "13":0, "12":0, "11":0, "10":0, "9":0, "8":0, "7":0, "6":0};
+        playerOutcomeProbsOnHit = this.currentDeck.calcPlayer(this.playerHand, playerOutcomeProbsOnHit);
+        let winIfStay = this.calcWinIfStay(dealerOutcomeProbs);
+        let winIfHit = this.calcWinIfHit(dealerOutcomeProbs, playerOutcomeProbsOnHit);
+    
         let p = '<tr><th>Outcomes</th>';
         for (let i = 6; i <=21; i++)
             p += '<th>' + i + '</th>';
@@ -306,26 +323,48 @@ class Game { //all visual updates should be handled by this object
         for (let i = 6; i <=16; i++)
             p += '<td></td>';
         for(let i = 17; i <= 21; i++) //Dealer Distribution
-            p += '<th>' + Math.round(this.dealerOutcomeProbs[i] * 1000) / 10 + '%</th>'; //add method create this percent calc
-        p += '<th>' + Math.round(this.dealerOutcomeProbs['bust'] * 1000) / 10 + '%</th></tr>';
+            p += '<th>' + Math.round(dealerOutcomeProbs[i] * 1000) / 10 + '%</th>'; //add method create this percent calc
+        p += '<th>' + Math.round(dealerOutcomeProbs['bust'] * 1000) / 10 + '%</th></tr>';
     
-        p += '<tr><th>Player</th>'
+        p += '<tr><th>Player Hit</th>'
         for(let i = 6; i <= 21; i++) //Player Distribution
-            p += '<th>' + Math.round(this.playerOutcomeProbsOnHit[i] * 1000) / 10 + '%</th>';
-        p += '<th>' + Math.round(this.playerOutcomeProbsOnHit['bust'] * 1000) / 10 + '%</th></tr>';
+            p += '<th>' + Math.round(playerOutcomeProbsOnHit[i] * 1000) / 10 + '%</th>';
+        p += '<th>' + Math.round(playerOutcomeProbsOnHit['bust'] * 1000) / 10 + '%</th></tr>';
     
         let w = '<tr><th>Action</th><th>Win Rate</th></tr>';
-        w += '<tr><th>Stay</th><th>' + Math.round(this.trueWinIfStay * 1000) / 10 + '%</th></tr>';
-        w += '<tr><th>Hit</th><th>' + Math.round(this.trueWinIfHit * 1000) / 10 + '%</th></tr>';
+        w += '<tr><th>Stay</th><th>' + Math.round(winIfStay * 1000) / 10 + '%</th></tr>';
+        w += '<tr><th>Hit</th><th>' + Math.round(winIfHit * 1000) / 10 + '%</th></tr>';
     
         let r = '<tr><th>Method</th><th>Single Game Win Rate</th><th>Recommended Action</th></tr>';
         r += '<tr><th>Basic Strategy</th><th></th><th style="font-weight:bold">' + '???' + '</th></tr>';
         r += '<tr><th>Hi-Lo</th><th></th><th style="font-weight:bold">' + '???' + '</th></tr>';
-        r += '<tr><th>Full Count</th><th></th><th style="font-weight:bold">' + (this.trueWinIfStay > this.trueWinIfHit ? 'stay' : 'hit') + '</th></tr>';
+        r += '<tr><th>Full Count</th><th></th><th style="font-weight:bold">' + (winIfStay > winIfHit ? 'stay' : 'hit') + '</th></tr>';
     
         document.getElementById('probabilities').innerHTML = p;
         document.getElementById('winRates').innerHTML = w;
         document.getElementById('recommend').innerHTML = r;    
+    }
+
+    basicStrategyHit(){
+
+        let playerTotal = this.playerHand.scoreHand();
+        let dealerCard = this.dealerHand.cardList[1];
+        
+        // if (this.playerHand.isPair())
+        // {
+        //     //look up pair splitting
+        //     //return true if hit
+        // }
+        if (this.playerHand.softHand())
+        {
+            // look up the soft total chart
+            //return true if hit
+        }
+        else
+        {
+            //look up hard total chart
+            //return true if hit
+        }
     }
 
 }
@@ -502,7 +541,7 @@ class Hand {
         this.value = 0;
     }
 
-    hit(deck){ //returns new hand value after hit
+    hit(deck) { //returns new hand value after hit
         let card = deck.draw();
         if(this.cardList.length === 0 && this.hideFirst)
         {
@@ -514,7 +553,7 @@ class Hand {
         return this.value;
     }
 
-    add(card){
+    add(card) {
         this.cardList.push(card);
         this.value = this.scoreHand();
         return this.value;
@@ -571,363 +610,27 @@ class Hand {
         }
     }
 
+    softHand() { //soft hand means hand includes an Ace
+        let i = (this.hideFirst) ? 1 : 0;
+        return this.cardList.includes("A", i);
+    }
+
+    isPair() { //return true if first two cards are equal value
+        let value10 = new Set(["10", "J", "Q", "K"]);
+        let card0 = (value10.has(this.cardList[0])) ? "T" : this.cardList[0];
+        let card1 = (value10.has(this.cardList[1])) ? "T" : this.cardList[1];
+        if (card0 == card1)
+        {
+            return true;
+        }
+        return false;
+    }
+
 }
 
 
 /*Create Game */
-
 currentGame = new Game(1000,1);
-
-/*old Functions*/
-/* function deal() {
-    clearHands();
-    currentBet = document.getElementById("bet").value;
-    balance -= currentBet;
-    document.getElementById("bet").setAttribute("disabled", "true");
-    document.getElementById("balance").innerHTML = balance;
-    document.getElementById("decks").disabled = true;
-    document.getElementById("set_decks").disabled = true;
-    document.getElementById("clear").disabled = true;
-    revealDealer = false;
-    setTimeout(() => {draw(playerHand, currentDeck)}, 500);
-    setTimeout(() => {draw(dealerHand, currentDeck)}, 1000);
-    setTimeout(() => {draw(playerHand, currentDeck)}, 1500);
-    setTimeout(() => {draw(dealerHand, currentDeck)}, 2000);
-
-    //check for blackjack
-    
-    document.getElementById("deal").disabled = true;
-    setTimeout(() => {document.getElementById("hit").disabled = false}, 2000);
-    setTimeout(() => {document.getElementById("stay").disabled = false}, 2000);
-
-
-    setTimeout(() => {updateProbs()}, 2010);
-
-}
-
-function draw(hand, deck) {
-    let card = deck.pop();
-    
-
-    currentCount[card]--;
-
-    if(minus.has(card))
-        runningCount--;
-    if (plus.has(card))
-        runningCount++;
-    trueCount = runningCount/(deck.length/52);
-
-    hand.push(card);
-    updateDisplay(); //do separately
-}
-
-function updateDisplay() { //make separate function to do "p"+i
-    //player
-    for(let i = 0; i < playerHand.length; i++)
-    {
-        var card = playerHand[i];
-        var currCard = document.getElementById("p"+i); //change currCard to cardElement
-        if(currCard === null) //make separate method to use for both player and dealer
-        {
-            var handHTML = document.getElementById("playerHand");
-            var tag = document.createElement("div");
-            tag.setAttribute("class", "card");
-            tag.setAttribute("id", "p"+i);
-            handHTML.appendChild(tag);
-            var currCard = document.getElementById("p"+i);
-        }
-        currCard.innerHTML = card;
-    }
-    var playerTotal = scoreHand(playerHand); //"playerScore"
-    if (playerTotal > 21)
-        playerTotal += " BUST"; //don't change int into string
-    document.getElementById("playerTotal").innerHTML = playerTotal;
-    //dealer
-    for(i = 0; i < dealerHand.length; i++)
-    {
-        if (!revealDealer && i === 0) //change to ternary operator: var card = (!revealDealer && i === 0) ? "?" : dealerHand[i];
-            var card = "?";
-        else
-            var card = dealerHand[i];
-        var currCard = document.getElementById("d"+i);
-        if(currCard === null)
-        {
-            var handHTML = document.getElementById("dealerHand");
-            var tag = document.createElement("div");
-            tag.setAttribute("class", "card");
-            tag.setAttribute("id", "d"+i);
-            handHTML.appendChild(tag);
-            var currCard = document.getElementById("d"+i);
-        }
-        currCard.innerHTML = card;
-    }
-    var dealerTotal = scoreHand(dealerHand, !revealDealer);
-    document.getElementById("dealerTotal").innerHTML = dealerTotal;
-
-    //counts
-    document.getElementById("deckCount").innerHTML = currentDeck.length;
-    document.getElementById("runningCount").innerHTML = runningCount;
-    document.getElementById("trueCount").innerHTML = Math.round(trueCount * 10) / 10;
-
-}
-
-function updateProbs() { //Create Templating system for HTML?
-    calcProbs(); //make calcProbs return dealerOutcomes, playerOutcomes, trueWins etc.
-
-    //build probability tables
-    let p = '<tr><th>Outcomes</th>';
-    for (let i = 6; i <=21; i++)
-        p += '<th>' + i + '</th>';
-    p += '<th>bust</th></tr>';
-
-    p += '<tr> <th>Dealer</th>';
-    for (let i = 6; i <=16; i++)
-        p += '<td></td>';
-    for(let i = 17; i <= 21; i++) //Dealer Distribution
-        p += '<th>' + Math.round(dealerOutcomes[i] * 1000) / 10 + '%</th>'; //add method create this percent calc
-    p += '<th>' + Math.round(dealerOutcomes['bust'] * 1000) / 10 + '%</th></tr>';
-
-    p += '<tr><th>Player</th>'
-    for(let i = 6; i <= 21; i++) //Player Distribution
-        p += '<th>' + Math.round(playerOutcomes[i] * 1000) / 10 + '%</th>';
-    p += '<th>' + Math.round(playerOutcomes['bust'] * 1000) / 10 + '%</th></tr>';
-
-    let w = '<tr><th>Action</th><th>Win Rate</th></tr>';
-    w += '<tr><th>Stay</th><th>' + Math.round(trueWinIfStay * 1000) / 10 + '%</th></tr>';
-    w += '<tr><th>Hit</th><th>' + Math.round(trueWinIfHit * 1000) / 10 + '%</th></tr>';
-
-    let r = '<tr><th>Method</th><th>Single Game Win Rate</th><th>Recommended Action</th></tr>';
-    r += '<tr><th>Basic Strategy</th><th></th><th style="font-weight:bold">' + '???' + '</th></tr>';
-    r += '<tr><th>Hi-Lo</th><th></th><th style="font-weight:bold">' + '???' + '</th></tr>';
-    r += '<tr><th>Full Count</th><th></th><th style="font-weight:bold">' + (trueWinIfStay > trueWinIfHit ? 'stay' : 'hit') + '</th></tr>';
-
-    document.getElementById('probabilities').innerHTML = p;
-    document.getElementById('winRates').innerHTML = w;
-    document.getElementById('recommend').innerHTML = r;
-
-
-}
-
-function hit() {
-    draw(playerHand, currentDeck);
-    //Check for bust
-    let score = scoreHand(playerHand);
-    if(score > 21)
-    {
-        revealDealer = true;
-        updateDisplay();
-        document.getElementById("playerTotal").innerHTML = score + " BUST";
-        endRound();
-    }
-    updateProbs();
-}
-
-function stay() {
-    revealDealer = true;
-    updateDisplay();
-    //deal dealer (will not deal if over 16 already)
-    while(scoreHand(dealerHand) < 17)
-    {
-        draw(dealerHand, currentDeck);
-        updateDisplay();
-    }
-    //score winner
-    let dealerScore = scoreHand(dealerHand);
-    let playerScore = scoreHand(playerHand);
-    if(dealerScore > 21)
-        {
-            document.getElementById("dealerTotal").innerHTML = dealerScore + " BUST";
-            balance += currentBet * 2;
-            document.getElementById("balance").innerHTML = balance;
-            trueWinIfStay = 0;
-        }
-
-    else if(dealerScore > playerScore)
-        document.getElementById("playerTotal").innerHTML = playerScore + " LOSE";
-    else if(dealerScore < playerScore)
-        {
-            document.getElementById("playerTotal").innerHTML = playerScore + " WIN";
-            balance += currentBet * 2;
-            document.getElementById("balance").innerHTML = balance;
-        }
-    else
-    {
-        trueWinIfStay = 0;
-        document.getElementById("playerTotal").innerHTML = playerScore + " PUSH";
-    }
-
-    endRound();
-}
-
-function endRound() {
-    document.getElementById("deal").disabled = false;
-    document.getElementById("hit").disabled = true;
-    document.getElementById("stay").disabled = true;
-    document.getElementById("clear").disabled = false;
-    document.getElementById("bet").disabled = false;
-
-    checkDeckSize();
-    document.getElementById("decks").disabled = false;
-    document.getElementById("set_decks").disabled = false;
-}
-
-function checkDeckSize() { //do this inline
-    if (currentDeck.length < numDecks * 13)
-        resetDecks();
-}
-
-function calcProbs() { //make more variables local, not global and return outputs to update probs.
-    
-    //Inefficient method uses all cards in available decks
-    //Better method uses "card list" (13 total cards) and checks currentCount for available cards
-
-    //Dealer probability
-    //Dictionary of all outcomes from 17 to bust (Dealer will recursively hit until in range or bust)
-    dealerOutcomes = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0}; //make this local not global
-    dealerNext(dealerHand, cardList, dealerOutcomes, currentCount);
-    
-    //Player outcomes
-    playerOutcomes = {"bust":0, 21:0, 20:0, 19:0, 18:0, 17:0, 16:0, 15:0, 14:0, 13:0, 12:0, 11:0, 10:0, 9:0, 8:0, 7:0, 6:0};
-    playerNext(playerHand, cardList, playerOutcomes, currentCount);
-
-    //Recommended Decision
-    winIfStay = 1;
-    playerScore = scoreHand(playerHand);
-    for (let i = Math.max(17,playerScore); i <= 21; i++)
-        winIfStay -= dealerOutcomes[i]; //Subtract outcomes where dealer has higher value
-    //True WinIfStay probability needs to ignore the chance of tying.
-    if (playerScore > 21)
-        trueWinIfStay = 0;
-    else if (playerScore >= 17) //tie is possible, only consider probability of win / probability of not tying
-        trueWinIfStay = winIfStay/(1 - dealerOutcomes[playerScore]);
-    else trueWinIfStay = winIfStay;
-
-    winIfHit = 0;
-    loseIfHit = 0;
-    for (let i = 17; i <= 21; i++)
-    {
-        for (let j = 6; j <= 21; j++)
-        {
-            if (j > i)
-                winIfHit += playerOutcomes[j] * dealerOutcomes[i];
-            if (i > j)
-                loseIfHit += playerOutcomes[j] * dealerOutcomes[i];
-        }
-    }
-    winIfHit += (1 - playerOutcomes["bust"]) * dealerOutcomes["bust"];
-    loseIfHit += playerOutcomes["bust"];
-    trueWinIfHit = winIfHit/(winIfHit + loseIfHit);
-}
-
-function dealerNext(hand, deck, outcomes, count, prob = 1) { // don't return?
-    //Calculate probability of each new potential hand
-    let totalCards = 0;
-    for (let c in count)
-        totalCards += count[c];
-    let currentProb = prob/totalCards;
-
-    //Create theoretical hands for "next" deck draw
-    for(let i = 0; i < deck.length; i++)
-    {
-        let tempHand = [];
-        let tempCount = {};
-        Object.assign(tempHand, hand);
-        Object.assign(tempCount, count);
-        let card = deck[i];
-        tempHand.push(card);
-        let newScore = scoreHand(tempHand, true);
-
-        if (newScore > 21)
-            outcomes["bust"] += currentProb * tempCount[card];
-        else if (newScore >= 17)
-            outcomes[newScore] += currentProb * tempCount[card];
-        else
-            outcomes = dealerNext(tempHand, deck, outcomes, tempCount, currentProb * tempCount[card]);
-    }
-    return outcomes; //don't need?
-}
-
-function playerNext(hand, deck, outcomes, count, prob = 1) {
-    //Calculate probability of each new potential hand
-    let totalCards = 0;
-    for (let c in count)
-        totalCards += count[c];
-    let currentProb = prob/totalCards;
-
-    //Create theoretical hands for "next" deck draw
-    for(let i = 0; i < deck.length; i++)
-    {
-        let tempHand = [];
-        let tempCount = {};
-        Object.assign(tempHand, hand);
-        Object.assign(tempCount, count);
-        let card = deck[i];
-        tempHand.push(card);
-        let newScore = scoreHand(tempHand, false);
-
-        if (newScore > 21)
-            outcomes["bust"] += currentProb * tempCount[card];
-        else
-            outcomes[newScore] += currentProb * tempCount[card];
-    }
-    return outcomes;//don't need?
-}
-
-function scoreHand(hand, hideFirst = false) {
-    let totalScore = 0;
-    let totalAce = 0;
-    let i = 0; //CHANGE to ternary
-    if(hideFirst) //Don't count 1st card
-        i = 1;
-    while(i < hand.length) {
-        let card = hand[i];
-        if (card === "A") {
-            totalScore += 11;
-            totalAce += 1;
-        }
-        else if(value10.has(card))
-            totalScore +=10;
-        else
-            totalScore += parseInt(card);
-        i++;
-    }
-    while(totalScore > 21 && totalAce > 0) {
-        totalScore -= 10;
-        totalAce -= 1;
-    }
-    return totalScore;
-}
-
-function clearHands() {
-    children = document.querySelectorAll('.card');
-    for(let i = 0; i < children.length; i++)
-        children[i].remove();
-    dealerHand = [];
-    playerHand = [];
-}
-
-function resetDecks() {
-    numDecks = document.getElementById("decks").value;
-    currentDeck = [];
-    for(decks = 0; decks < numDecks; decks++)
-        for(let i = 0; i < fullDeck.length; i++)
-            currentDeck.push(fullDeck[i]);
-    shuffle(currentDeck);
-
-    currentCount = {};
-    Object.assign(currentCount, fullCount);
-    for (var card in fullCount)
-        currentCount[card] = fullCount[card] * numDecks;
-    
-    runningCount = 0;
-    trueCount = 0;
-
-    document.getElementById("deal").disabled = false;
-    document.getElementById("set_decks").innerHTML = "Reset";
-
-}
-*/
-
 
 
 /*Listeners*/
@@ -935,7 +638,7 @@ document.querySelector("#set_decks").addEventListener('click', currentGame.reset
 document.querySelector("#deal").addEventListener('click', currentGame.deal.bind(currentGame));
 document.querySelector("#hit").addEventListener('click', currentGame.hit.bind(currentGame));
 document.querySelector("#stay").addEventListener('click', currentGame.stay.bind(currentGame));
-// document.querySelector("#double").addEventListener('click', double);
+document.querySelector("#double").addEventListener('click', currentGame.double.bind(currentGame));
 // document.querySelector("#split").addEventListener('click', split);
 // document.querySelector("#surrender").addEventListener('click', surrender);
 //document.querySelector("#clear").addEventListener('click', clearHands);
