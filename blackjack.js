@@ -21,7 +21,7 @@ Calculate expected value by action for:
     full counting
 
 DONE Blackjack pays 3-2 (does dealer continue drawing?)
-DONE Double
+Dealer has blackjack
 Split (This requires updating to multiple players)
 Surrender
 Change options (blackjack payout, # of decks, H17 or S17)
@@ -336,19 +336,23 @@ class Game { //all visual updates should be handled by this object
         w += '<tr><th>Hit</th><th>' + Math.round(winIfHit * 1000) / 10 + '%</th></tr>';
     
         let r = '<tr><th>Method</th><th>Single Game Win Rate</th><th>Recommended Action</th></tr>';
-        r += '<tr><th>Basic Strategy</th><th></th><th style="font-weight:bold">' + '???' + '</th></tr>';
+        r += '<tr><th>Basic Strategy</th><th></th><th style="font-weight:bold">' + this.basicStrategy() + '</th></tr>';
         r += '<tr><th>Hi-Lo</th><th></th><th style="font-weight:bold">' + '???' + '</th></tr>';
-        r += '<tr><th>Full Count</th><th></th><th style="font-weight:bold">' + (winIfStay > winIfHit ? 'stay' : 'hit') + '</th></tr>';
+        r += '<tr><th>Full Count</th><th></th><th style="font-weight:bold">' + (winIfStay > winIfHit ? 'Stay' : 'Hit') + '</th></tr>';
     
         document.getElementById('probabilities').innerHTML = p;
         document.getElementById('winRates').innerHTML = w;
-        document.getElementById('recommend').innerHTML = r;    
+        document.getElementById('recommend').innerHTML = r;
     }
 
-    basicStrategyHit(){
-
-        let playerTotal = this.playerHand.scoreHand();
-        let dealerCard = this.dealerHand.cardList[1];
+    basicStrategy(){
+        let playerIndex = this.playerHand.scoreHand();
+        let dealerIndex = this.dealerHand.scoreHand();
+        if (dealerIndex > 10)
+        {
+            dealerIndex -= 10;
+        }
+        let action = {'H':'Hit', 'D': 'Double', 'S':'Stay'};
         
         // if (this.playerHand.isPair())
         // {
@@ -357,13 +361,44 @@ class Game { //all visual updates should be handled by this object
         // }
         if (this.playerHand.softHand())
         {
-            // look up the soft total chart
-            //return true if hit
+            playerIndex = playerIndex - 11; // Minus 11 to remove ace, minus 1 to start index at 0;
+            let softChart = 
+            //   'A', '2', '3', '4', '5', '6', '7', '8', '9', '10' = Dealer Card
+            [   ['H', 'H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H'], //A,A
+                ['H', 'H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H'], //A,2
+                ['H', 'H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H'], //A,3
+                ['H', 'H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H'], //A,4
+                ['H', 'H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H'], //A,5
+                ['H', 'H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H'], //A,6
+                ['H', 'D', 'D', 'D', 'D', 'D', 'S', 'S', 'H', 'H'], //A,7
+                ['S', 'S', 'S', 'S', 'S', 'D', 'S', 'S', 'S', 'S'], //A,8
+                ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'], //A,9
+                ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'] //A,10 I don't think this will get used
+            ];
+            return action[softChart[playerIndex - 1][dealerIndex - 1]];
         }
         else
         {
-            //look up hard total chart
-            //return true if hit
+            let hardChart = 
+            //   'A', '2', '3', '4', '5', '6', '7', '8', '9', '10' = Dealer Card
+            [   ['H', 'H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H'], //9
+                ['H', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'H'], //10
+                ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'], //11
+                ['H', 'H', 'H', 'S', 'S', 'S', 'H', 'H', 'H', 'H'], //12
+                ['H', 'S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H'], //13
+                ['H', 'S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H'], //14
+                ['H', 'S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H'], //15
+                ['H', 'S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H'] //16
+            ];
+            if (playerIndex < 9)
+            {
+                return 'Hit';
+            }
+            if (playerIndex > 16)
+            {
+                return 'Stay';
+            }
+            return action[hardChart[playerIndex - 9][dealerIndex - 1]]; //Chart starts at 9
         }
     }
 
