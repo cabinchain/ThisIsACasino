@@ -22,7 +22,11 @@ section {
 tr, th {
     border: 1px solid;
     table-layout: auto;
-    width: 150px;
+    width: 80px;
+}
+td {
+    table-layout: auto;
+    width: 80px;
 }
 
 .cell {
