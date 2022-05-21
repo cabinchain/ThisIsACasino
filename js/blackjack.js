@@ -5,32 +5,30 @@ Win percentages are probability of win / probability of win or lose. This ignore
 
 TODO
 Current issues
-0) Make OOP - Decks, Hands, Game - functions should include: shuffle, reset deck, draw? Hand?
 1) When deck resets, there is no indication.
-2) Card counting includes face down dealer card right now - need to exclude until revealed
-    Solution: In deal function, add facedown card back into count. In stay function, subtract it.
-3) Change game so dealer hits on soft 17 (more common?)
 4) Can bet negative, fix that
+5) Full count recommendation only considers 1 hit, not overall strategy
+6) If dealer shows A or 10, dealer predictor should not consider 21 possible
+7) For unit testing, want to have a parameter to select hands and such. Is there a way to make "hand this.dealerHand" as a parameter
+8) Change game so dealer hits on soft 17 (more common?)
 
 Develop
 Add deviations for count
 Single game win rates?
 Calculate expected value by action for:
     No counting
-    Point counting
+    hilo counting
     full counting
 
-DONE Blackjack pays 3-2 (does dealer continue drawing?)
-Dealer has blackjack
+display deck count?
 Split (This requires updating to multiple players)
-Surrender
 Change options (blackjack payout, # of decks, H17 or S17)
-If player hits 21, should I automatically stay?
 Add Delay to dealer drawing cards in stay function
 
 Unit Testing:
 blackjack
 Test on a push (betting money outcomes and display)
+basic strategy outcomes
 
 */
 
@@ -52,7 +50,7 @@ class Game { //all visual updates should be handled by this object
         this.currentBet = 0;
         this.dealerHand = new Hand(true);
         this.playerHand = new Hand(false);
-        document.getElementById("deal").disabled = false;
+        //document.getElementById("deal").disabled = false;
     }
 
     resetDecks(){
@@ -127,6 +125,7 @@ class Game { //all visual updates should be handled by this object
         let score = this.playerHand.hit(this.currentDeck);
         this.updateDisplay();
         this.updateProbs();
+        document.getElementById("double").disabled = true; // Cannot double down after hitting once already
         if (score > 21)
         {
             this.dealerHand.reveal();
@@ -177,11 +176,23 @@ class Game { //all visual updates should be handled by this object
         //score winner (player wins on blackjack)
         //Pay bet (include blackjack payout)
         //update HTML incl buttons
-        if (playerScore === 21 && this.playerHand.cardList.length === 2)
+        if (dealerScore === playerScore)
+        {
+            dealerStatus = "";
+            playerStatus = "PUSH";
+            this.balance += parseInt(this.currentBet);
+        }
+        else if (playerScore === 21 && this.playerHand.cardList.length === 2)
         {
             dealerStatus = "";
             playerStatus = "BLACKJACK";
             this.balance += Math.floor(this.currentBet * 2.5);
+        }
+        else if (dealerScore === 21 && this.playerHand.cardList.length === 2)
+        {
+            dealerStatus = "BLACKJACK";
+            playerStatus = "";
+            // No Payout
         }
         else if (playerScore > 21)
         {
@@ -193,12 +204,6 @@ class Game { //all visual updates should be handled by this object
             dealerStatus = "BUST";
             playerStatus = "WIN";
             this.balance += this.currentBet * 2;
-        }
-        else if (dealerScore === playerScore)
-        {
-            dealerStatus = "";
-            playerStatus = "PUSH";
-            this.balance += parseInt(this.currentBet);
         }
         else if (playerScore == 0)
         { //Surrendered
@@ -356,7 +361,9 @@ class Game { //all visual updates should be handled by this object
         let r = '<tr><th>Method</th><th>Single Game Win Rate</th><th>Recommended Action</th></tr>';
         r += '<tr><th>Basic Strategy</th><th></th><th style="font-weight:bold">' + this.basicStrategy() + '</th></tr>';
         r += '<tr><th>Hi-Lo</th><th></th><th style="font-weight:bold">' + '???' + '</th></tr>';
-        r += '<tr><th>Full Count</th><th></th><th style="font-weight:bold">' + (winIfStay > winIfHit ? 'Stay' : 'Hit') + '</th></tr>';
+        r += '<tr><th>Full Count</th><th></th><th style="font-weight:bold">'
+        r += Math.max(winIfStay,winIfHit) < 0.25 ? 'Surrender' : (winIfHit > 0.5 ? 'Double' : (winIfStay > winIfHit ? 'Stay' : 'Hit') );
+        r += '</th></tr>';
     
         document.getElementById('probabilities').innerHTML = p;
         document.getElementById('winRates').innerHTML = w;
@@ -370,7 +377,7 @@ class Game { //all visual updates should be handled by this object
         {
             dealerIndex -= 10;
         }
-        let action = {'H':'Hit', 'D': 'Double', 'S':'Stay'};
+        let action = {'H':'Hit', 'D': 'Double', 'S':'Stay', 'U':'Surrender'};
         
         // if (this.playerHand.isPair())
         // {
@@ -405,8 +412,8 @@ class Game { //all visual updates should be handled by this object
                 ['H', 'H', 'H', 'S', 'S', 'S', 'H', 'H', 'H', 'H'], //12
                 ['H', 'S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H'], //13
                 ['H', 'S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H'], //14
-                ['H', 'S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H'], //15
-                ['H', 'S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'H'] //16
+                ['H', 'S', 'S', 'S', 'S', 'S', 'H', 'H', 'H', 'U'], //15
+                ['U', 'S', 'S', 'S', 'S', 'S', 'H', 'H', 'U', 'U']  //16
             ];
             if (playerIndex < 9)
             {
@@ -498,7 +505,6 @@ class Deck {
         this.hiddenCard = "";
         return card;
     }
-
 
     calcDealer(hand, outcomes, count = this.currentCount,prob = 1) { //previously dealernext()
         let cardList = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
@@ -654,7 +660,7 @@ class Hand {
         return "";
     }
 
-    peak() {
+    peak() { //returns value of full hand including face down card
         this.hideFirst = false;
         let score = this.scoreHand();
         this.hideFirst = true;
@@ -670,7 +676,7 @@ class Hand {
         }
     }
 
-    softHand() { //soft hand means hand includes an Ace
+    softHand() { //soft hand means hand that includes A (only used with 2 cards)
         let i = (this.hideFirst) ? 1 : 0;
         return this.cardList.includes("A", i);
     }
@@ -688,12 +694,14 @@ class Hand {
 
 }
 
+//import Hand from './hand.js';
 
 /*Create Game */
-currentGame = new Game(1000,1);
+let currentGame = new Game(1000,1);
 
 
 /*Listeners*/
+document.addEventListener('DOMContentLoaded', function () {
 document.querySelector("#set_decks").addEventListener('click', currentGame.resetDecks.bind(currentGame));
 document.querySelector("#deal").addEventListener('click', currentGame.deal.bind(currentGame));
 document.querySelector("#hit").addEventListener('click', currentGame.hit.bind(currentGame));
@@ -702,3 +710,10 @@ document.querySelector("#double").addEventListener('click', currentGame.double.b
 // document.querySelector("#split").addEventListener('click', split);
 document.querySelector("#surrender").addEventListener('click', currentGame.surrender.bind(currentGame));
 //document.querySelector("#clear").addEventListener('click', clearHands);
+});
+
+//export {default as Game} from './Game';
+//export {default as Deck} from './Deck';
+//export {default as Hand} from './Hand';
+
+export{Game, Deck, Hand};
