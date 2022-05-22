@@ -694,8 +694,6 @@ class Hand {
 
 }
 
-//import Hand from './hand.js';
-
 /*Create Game */
 let currentGame = new Game(1000,1);
 
@@ -711,9 +709,5 @@ document.querySelector("#double").addEventListener('click', currentGame.double.b
 document.querySelector("#surrender").addEventListener('click', currentGame.surrender.bind(currentGame));
 //document.querySelector("#clear").addEventListener('click', clearHands);
 });
-
-//export {default as Game} from './Game';
-//export {default as Deck} from './Deck';
-//export {default as Hand} from './Hand';
 
 export{Game, Deck, Hand};
