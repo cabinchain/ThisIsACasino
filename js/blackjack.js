@@ -108,6 +108,7 @@ class Game { //all visual updates should be handled by this object
         {
             this.dealerHand.reveal();
             this.endRound();
+            return true;
         }
         return false;
     }
@@ -300,8 +301,11 @@ class Game { //all visual updates should be handled by this object
         let winIfStay = 1;
         let playerScore = this.playerHand.scoreHand();
         for (let i = Math.max(17,playerScore); i <= 21; i++)
-            winIfStay -= dealerOutcomeProbs[i.toString()]; //Subtract outcomes where dealer has higher value
-        //True WinIfStay probability needs to ignore the chance of tying.
+            {
+                winIfStay -= dealerOutcomeProbs[i.toString()]; //Subtract outcomes where dealer has higher value
+            }
+        winIfStay -= dealerOutcomeProbs["bust"];
+            //True WinIfStay probability needs to ignore the chance of tying.
         if (playerScore > 21)
             winIfStay = 0;
         else if (playerScore >= 17) //tie is possible, only consider probability of win / probability of not tying
@@ -506,7 +510,7 @@ class Deck {
         return card;
     }
 
-    calcDealer(hand, outcomes, count = this.currentCount,prob = 1) { //previously dealernext()
+    calcDealer(hand, outcomes, count = this.currentCount, prob = 1) { //previously dealernext()
         let cardList = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
         //Calculate probability of each new potential hand
         let totalCards = 0;
