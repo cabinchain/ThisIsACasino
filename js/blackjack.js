@@ -11,6 +11,7 @@ Current issues
 6) If dealer shows A or 10, dealer predictor should not consider 21 possible
 7) For unit testing, want to have a parameter to select hands and such. Is there a way to make "hand this.dealerHand" as a parameter
 8) Change game so dealer hits on soft 17 (more common?)
+9) Dealer shows blackjack with more than 3 cards
 
 Develop
 Add deviations for count
@@ -304,7 +305,7 @@ class Game { //all visual updates should be handled by this object
             {
                 winIfStay -= dealerOutcomeProbs[i.toString()]; //Subtract outcomes where dealer has higher value
             }
-        winIfStay -= dealerOutcomeProbs["bust"];
+        //winIfStay -= dealerOutcomeProbs["bust"];
             //True WinIfStay probability needs to ignore the chance of tying.
         if (playerScore > 21)
             winIfStay = 0;
@@ -364,7 +365,7 @@ class Game { //all visual updates should be handled by this object
     
         let r = '<tr><th>Method</th><th>Single Game Win Rate</th><th>Recommended Action</th></tr>';
         r += '<tr><th>Basic Strategy</th><th></th><th style="font-weight:bold">' + this.basicStrategy() + '</th></tr>';
-        r += '<tr><th>Hi-Lo</th><th></th><th style="font-weight:bold">' + '???' + '</th></tr>';
+        r += '<tr><th>Hi-Lo</th><th></th><th style="font-weight:bold">' + this.deviationStrategy(this.currentDeck.hiloCount) + '</th></tr>';
         r += '<tr><th>Full Count</th><th></th><th style="font-weight:bold">'
         r += Math.max(winIfStay,winIfHit) < 0.25 ? 'Surrender' : (winIfHit > 0.5 ? 'Double' : (winIfStay > winIfHit ? 'Stay' : 'Hit') );
         r += '</th></tr>';
@@ -382,6 +383,7 @@ class Game { //all visual updates should be handled by this object
             dealerIndex -= 10;
         }
         let action = {'H':'Hit', 'D': 'Double', 'S':'Stay', 'U':'Surrender'};
+        let result = '';
         
         // if (this.playerHand.isPair())
         // {
@@ -404,7 +406,14 @@ class Game { //all visual updates should be handled by this object
                 ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'], //A,9
                 ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'] //A,10 I don't think this will get used
             ];
-            return action[softChart[playerIndex - 1][dealerIndex - 1]];
+            if (playerIndex >= 11)
+            {
+                result = 'S';
+            }
+            else
+            {
+                result = softChart[playerIndex - 1][dealerIndex - 1];
+            }
         }
         else
         {
@@ -427,8 +436,60 @@ class Game { //all visual updates should be handled by this object
             {
                 return 'Stay';
             }
-            return action[hardChart[playerIndex - 9][dealerIndex - 1]]; //Chart starts at 9
+            result = hardChart[playerIndex - 9][dealerIndex - 1] //Chart starts at 9
         }
+        if (this.playerHand.cardList.length > 2 && result == 'D')
+        {
+            return 'Hit'
+        }
+        return action[result];
+    }
+
+    deviationStrategy(count){
+        let playerIndex = this.playerHand.scoreHand();
+        let dealerIndex = this.dealerHand.scoreHand();
+        if (dealerIndex > 10)
+        {
+            dealerIndex -= 10;
+        }
+        let action = {'H':'Hit', 'D': 'Double', 'S':'Stay', 'U':'Surrender'};
+        let deviationList = 
+            //   'A',       '2',        '3',        '4',        '5',        '6',        '7',        '8','9',       '10' = Dealer Card
+            [   [{},        {'1':'D'},  {},         {},         {},         {},         {'3':'D'},  {}, {},         {}       ], //9
+                [{'4':'D'}, {},         {},         {},         {},         {},         {},         {}, {},         {'4':'D'}], //10
+                [{'1':'D'}, {},         {},         {},         {},         {},         {},         {}, {},         {}       ], //11
+                [{},        {'3':'S'},  {'2':'S'},  {'0':'S'},  {'-2':'S'}, {'-1':'S'}, {},         {}, {},         {}       ], //12
+                [{},        {'0':'S'},  {'-2':'H'}, {},         {},         {},         {},         {}, {},         {}       ], //13
+                [{},        {},         {},         {},         {},         {},         {},         {}, {},         {'3':'U'}], //14
+                [{'1':'U'}, {},         {},         {},         {},         {},         {},         {}, {'3':'U'},  {'4':'S'}], //15
+                [{},        {},         {},         {},         {},         {},         {},         {}, {'4':'S'},  {'0':'S'}]  //16
+            ]; //Read: If you have a hand of 16 against the dealer’s 10-valued card you should stand at a count of 0 or higher
+        
+        let deviation = {};
+        if (playerIndex > 16 || playerIndex < 9)
+        {
+            deviation = {};
+        }
+        else
+        {
+            deviation = deviationList[playerIndex - 9][dealerIndex - 1];
+        }
+        console.log(deviation);
+        
+        for (let i = -4; i <= count; i++) // Increment from lowest number to current count. If there is a deviation worth taking, i will become that.
+        {
+            if (i in deviation) //
+            {
+                if (this.playerHand.cardList.length > 2 && action[deviation[i]] == 'D')
+                {
+                    return 'Hit'
+                }
+                return action[deviation[i]];
+            }
+        }
+
+        return this.basicStrategy();
+
     }
 
 }

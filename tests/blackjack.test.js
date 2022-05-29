@@ -135,9 +135,9 @@ test("Game object test function checkBlackjack", () =>{
 
 let game2 = new Game(1000,2);
 game2.playerHand.cardList = ["9", "K"];
-let dealerOutcomes2 = {"bust":0.19, "21":0.165, "20":0.145, "19":0.2, "18":0.2, "17":0.1};
-test("0.3/0.8 chance of winning based on probability dealer has 17 or 18, excludes prob of 19", () =>{
-    expect(Math.round(game2.calcWinIfStay(dealerOutcomes2) * 1000)/1000).toBe(0.375);
+let dealerOutcomes2 = {"bust":0.2, "21":0.165, "20":0.135, "19":0.2, "18":0.2, "17":0.1};
+test("0.5/0.8 chance of winning based on probability dealer has 17 or 18, or busts, excludes prob of 19", () =>{
+    expect(Math.round(game2.calcWinIfStay(dealerOutcomes2) * 1000)/1000).toBe(0.625);
 });
 
 let game3 = new Game(1000,2);
@@ -147,3 +147,19 @@ test("75% chance of winning", () =>{
     expect(Math.round(game3.calcWinIfHit(dealerOutcomes3, playerOutcomes3) * 1000)/1000).toBe(0.75);
 });
 
+let game4 = new Game(1000,2);
+game4.playerHand.cardList = ["A", "5"];
+game4.dealerHand.cardList = ["K", "6"];
+test("test basic strategy", () =>{
+    expect(game4.basicStrategy()).toBe('Double');
+});
+
+let game5 = new Game(1000,2);
+game5.playerHand.cardList = ["10", "2"];
+game5.dealerHand.cardList = ["K", "3"];
+test("test deviations", () =>{
+    expect(game5.deviationStrategy(3)).toBe('Stay');
+});
+test("test when deviation exists but count does not meet requirement", () =>{
+    expect(game5.deviationStrategy(0)).toBe('Hit');
+});
